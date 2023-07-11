@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TodosController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">example</a> &gt; <a href="index.source.html" class="el_package">edu.ucsb.cs156.example.controllers</a> &gt; <span class="el_source">TodosController.java</span></div><h1>TodosController.java</h1><pre class="source lang-java linenums">package edu.ucsb.cs156.example.controllers;
+
+import edu.ucsb.cs156.example.entities.Todo;
+import edu.ucsb.cs156.example.entities.User;
+import edu.ucsb.cs156.example.errors.EntityNotFoundException;
+import edu.ucsb.cs156.example.models.CurrentUser;
+import edu.ucsb.cs156.example.repositories.TodoRepository;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.validation.Valid;
+import java.util.Optional;
+
+@Api(description = &quot;Todos&quot;)
+@RequestMapping(&quot;/api/todos&quot;)
+@RestController
+<span class="fc" id="L35">@Slf4j</span>
+<span class="fc" id="L36">public class TodosController extends ApiController {</span>
+
+    @Autowired
+    TodoRepository todoRepository;
+
+    @ApiOperation(value = &quot;List all todos&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_ADMIN')&quot;)
+    @GetMapping(&quot;/admin/all&quot;)
+    public Iterable&lt;Todo&gt; allUsersTodos() {
+<span class="fc" id="L45">        Iterable&lt;Todo&gt; todos = todoRepository.findAll();</span>
+<span class="fc" id="L46">        return todos;</span>
+    }
+
+    @ApiOperation(value = &quot;List this user's todos&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_USER')&quot;)
+    @GetMapping(&quot;/all&quot;)
+    public Iterable&lt;Todo&gt; thisUsersTodos() {
+<span class="fc" id="L53">        CurrentUser currentUser = getCurrentUser();</span>
+<span class="fc" id="L54">        Iterable&lt;Todo&gt; todos = todoRepository.findAllByUserId(currentUser.getUser().getId());</span>
+<span class="fc" id="L55">        return todos;</span>
+    }
+
+    @ApiOperation(value = &quot;Get a single todo (if it belongs to current user)&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_USER')&quot;)
+    @GetMapping(&quot;&quot;)
+    public Todo getTodoById(
+            @ApiParam(&quot;id&quot;) @RequestParam Long id) {
+<span class="fc" id="L63">        User currentUser = getCurrentUser().getUser();</span>
+<span class="fc" id="L64">        Todo todo = todoRepository.findByIdAndUser(id, currentUser)</span>
+<span class="fc" id="L65">          .orElseThrow(() -&gt; new EntityNotFoundException(Todo.class, id));</span>
+
+<span class="fc" id="L67">        return todo;</span>
+    }
+
+    @ApiOperation(value = &quot;Get a single todo (no matter who it belongs to, admin only)&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_ADMIN')&quot;)
+    @GetMapping(&quot;/admin&quot;)
+    public Todo getTodoById_admin(
+            @ApiParam(&quot;id&quot;) @RequestParam Long id) {
+<span class="fc" id="L75">        Todo todo = todoRepository.findById(id)</span>
+<span class="fc" id="L76">          .orElseThrow(() -&gt; new EntityNotFoundException(Todo.class, id));</span>
+
+<span class="fc" id="L78">        return todo;</span>
+    }
+
+    @ApiOperation(value = &quot;Create a new Todo&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_USER')&quot;)
+    @PostMapping(&quot;/post&quot;)
+    public Todo postTodo(
+            @ApiParam(&quot;title&quot;) @RequestParam String title,
+            @ApiParam(&quot;details&quot;) @RequestParam String details,
+            @ApiParam(&quot;done&quot;) @RequestParam Boolean done) {
+<span class="fc" id="L88">        CurrentUser currentUser = getCurrentUser();</span>
+<span class="fc" id="L89">        log.info(&quot;currentUser={}&quot;, currentUser);</span>
+
+<span class="fc" id="L91">        Todo todo = new Todo();</span>
+<span class="fc" id="L92">        todo.setUser(currentUser.getUser());</span>
+<span class="fc" id="L93">        todo.setTitle(title);</span>
+<span class="fc" id="L94">        todo.setDetails(details);</span>
+<span class="fc" id="L95">        todo.setDone(done);</span>
+<span class="fc" id="L96">        Todo savedTodo = todoRepository.save(todo);</span>
+<span class="fc" id="L97">        return savedTodo;</span>
+    }
+
+    @ApiOperation(value = &quot;Delete a Todo owned by this user&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_USER')&quot;)
+    @DeleteMapping(&quot;&quot;)
+    public Object deleteTodo(
+            @ApiParam(&quot;id&quot;) @RequestParam Long id) {
+<span class="fc" id="L105">        User currentUser = getCurrentUser().getUser();</span>
+<span class="fc" id="L106">        Todo todo = todoRepository.findByIdAndUser(id, currentUser)</span>
+<span class="fc" id="L107">          .orElseThrow(() -&gt; new EntityNotFoundException(Todo.class, id));</span>
+
+<span class="fc" id="L109">        todoRepository.delete(todo);</span>
+
+<span class="fc" id="L111">        return genericMessage(&quot;Todo with id %s deleted&quot;.formatted(id));</span>
+
+    }
+
+    @ApiOperation(value = &quot;Delete another user's todo&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_ADMIN')&quot;)
+    @DeleteMapping(&quot;/admin&quot;)
+    public Object deleteTodo_Admin(
+            @ApiParam(&quot;id&quot;) @RequestParam Long id) {
+<span class="fc" id="L120">        Todo todo = todoRepository.findById(id)</span>
+<span class="fc" id="L121">          .orElseThrow(() -&gt; new EntityNotFoundException(Todo.class, id));</span>
+
+<span class="fc" id="L123">        todoRepository.delete(todo);</span>
+
+<span class="fc" id="L125">        return genericMessage(&quot;Todo with id %s deleted&quot;.formatted(id));</span>
+    }
+
+    @ApiOperation(value = &quot;Update a single todo (if it belongs to current user)&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_USER')&quot;)
+    @PutMapping(&quot;&quot;)
+    public Todo putTodoById(
+            @ApiParam(&quot;id&quot;) @RequestParam Long id,
+            @RequestBody @Valid Todo incomingTodo) {
+<span class="fc" id="L134">        User currentUser = getCurrentUser().getUser();</span>
+<span class="fc" id="L135">        Todo todo = todoRepository.findByIdAndUser(id, currentUser)</span>
+<span class="fc" id="L136">          .orElseThrow(() -&gt; new EntityNotFoundException(Todo.class, id));</span>
+
+<span class="fc" id="L138">        todo.setTitle(incomingTodo.getTitle());</span>
+<span class="fc" id="L139">        todo.setDetails(incomingTodo.getDetails());</span>
+<span class="fc" id="L140">        todo.setDone(incomingTodo.isDone());</span>
+
+<span class="fc" id="L142">        todoRepository.save(todo);</span>
+
+<span class="fc" id="L144">        return todo;</span>
+    }
+
+    @ApiOperation(value = &quot;Update a single todo (regardless of ownership, admin only, can't change ownership)&quot;)
+    @PreAuthorize(&quot;hasRole('ROLE_ADMIN')&quot;)
+    @PutMapping(&quot;/admin&quot;)
+    public Todo putTodoById_admin(
+            @ApiParam(&quot;id&quot;) @RequestParam Long id,
+            @RequestBody @Valid Todo incomingTodo) {
+<span class="fc" id="L153">        Todo todo = todoRepository.findById(id)</span>
+<span class="fc" id="L154">          .orElseThrow(() -&gt; new EntityNotFoundException(Todo.class, id));</span>
+
+<span class="fc" id="L156">        todo.setTitle(incomingTodo.getTitle());</span>
+<span class="fc" id="L157">        todo.setDetails(incomingTodo.getDetails());</span>
+<span class="fc" id="L158">        todo.setDone(incomingTodo.isDone());</span>
+
+<span class="fc" id="L160">        todoRepository.save(todo);</span>
+
+<span class="fc" id="L162">        return todo;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
