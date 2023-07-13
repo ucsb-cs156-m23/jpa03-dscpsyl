@@ -2,8 +2,6 @@
 
 Running at: <https://jpa03-dscpsyl.dokku-07.cs.ucsb.edu>
 
-Main assigment: <https://ucsb-cs156.github.io/m23/lab/jpa03.html>
-
 # Getting Started on localhost
 
 Before running the application for the first time on localhost, you must: 
